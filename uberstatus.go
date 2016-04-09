@@ -17,6 +17,7 @@ import (
 	"github.com/XANi/uberstatus/i3bar"
 	"github.com/XANi/uberstatus/plugin"
 	"github.com/XANi/uberstatus/uber"
+	"github.com/XANi/uberstatus/util"
 )
 
 type Config struct {
@@ -109,7 +110,9 @@ func main() {
 		}
 		fmt.Print(`[`)
 		for idx, msg := range plugins.slots {
+			msg.BackgroundColor = util.GetBackground()
 			os.Stdout.Write(msg.Encode())
+			// JSON bitches about extra commas, make it happy
 			if idx+1 < (len(plugins.slots)) {
 				fmt.Print(`,`)
 			}
@@ -122,6 +125,10 @@ func main() {
 func (plugins *pluginMap) parseUpdate(update uber.Update) {
 	if val, ok := plugins.slotMap[update.Name][update.Instance]; ok {
 		plugins.slots[val] = i3bar.CreateMsg(update)
+		plugins.slots[val].BackgroundColor = util.GetBackground()
+		plugins.slots[val].Separator = false
+		plugins.slots[val].SeparatorBlockWidth = 0
+
 	} else {
 		log.Warning("Got msg from unknown place, name: %s, instance: %s", update.Name, update.Instance)
 	}
