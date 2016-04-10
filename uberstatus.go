@@ -32,10 +32,11 @@ var logFormat = logging.MustStringFormatter(
 
 type pluginMap struct {
 	// channels used to send events to plugin
-	input   map[string]map[string]chan uber.Event
-	output  map[string]map[string]chan uber.Update
-	slots   []i3bar.Msg
-	slotMap map[string]map[string]int
+	input     map[string]map[string]chan uber.Event
+	output    map[string]map[string]chan uber.Update
+	slots     []i3bar.Msg
+	slotMap   map[string]map[string]int
+	slotColor []string
 }
 
 func main() {
@@ -70,10 +71,12 @@ func main() {
 	updates := make(chan uber.Update, 100)
 	cfg := config.LoadConfig()
 	plugins := pluginMap{
-		slotMap: make(map[string]map[string]int),
-		slots:   make([]i3bar.Msg, len(cfg.Plugins)),
-		input:   make(map[string]map[string]chan uber.Event, 1),
+		slotMap:   make(map[string]map[string]int),
+		slots:     make([]i3bar.Msg, len(cfg.Plugins)),
+		slotColor: make([]string, len(cfg.Plugins)+1),
+		input:     make(map[string]map[string]chan uber.Event, 1),
 	}
+	pal := util.NewPalette([]string{})
 	for idx, pluginCfg := range cfg.Plugins {
 		log.Info("Loading plugin %s into slot %d: %+v", pluginCfg.Plugin, idx, pluginCfg)
 		if plugins.slotMap[pluginCfg.Name] == nil {
@@ -83,12 +86,12 @@ func main() {
 		//		if len(pluginCfg.Instance) == 0 {
 		//			pluginCfg.Instance = pluginCfg.Name
 		//		}
-
 		plugins.slotMap[pluginCfg.Name][pluginCfg.Instance] = idx
 		plugins.slots[idx] = i3bar.NewMsg()
+		plugins.slotColor[idx] = pal.GetNext()
 		plugins.input[pluginCfg.Name][pluginCfg.Instance] = plugin.NewPlugin(pluginCfg.Name, pluginCfg.Instance, pluginCfg.Plugin, pluginCfg.Config, updates)
 	}
-
+	plugins.slotColor[len(cfg.Plugins)] = "#111111"
 	// fmt.Println("\n[")
 
 	// plugins := config.Plugins
@@ -110,7 +113,7 @@ func main() {
 		}
 		fmt.Print(`[`)
 		for idx, msg := range plugins.slots {
-			msg.BackgroundColor = util.GetBackground()
+			//			msg.BackgroundColor =
 			os.Stdout.Write(msg.Encode())
 			// JSON bitches about extra commas, make it happy
 			if idx+1 < (len(plugins.slots)) {
@@ -125,7 +128,17 @@ func main() {
 func (plugins *pluginMap) parseUpdate(update uber.Update) {
 	if val, ok := plugins.slotMap[update.Name][update.Instance]; ok {
 		plugins.slots[val] = i3bar.CreateMsg(update)
-		plugins.slots[val].BackgroundColor = util.GetBackground()
+		plugins.slots[val].BackgroundColor = plugins.slotColor[val]
+		plugins.slots[val].BackgroundColor = plugins.slotColor[val]
+		plugins.slots[val].BackgroundColor = plugins.slotColor[val]
+		plugins.slots[val].Markup = `pango`
+		plugins.slots[val].FullText =
+			plugins.slots[val].FullText +
+				`<span color="` + plugins.slotColor[val] +
+				`" background="` + plugins.slotColor[val+1] +
+				`">` +
+				`` +
+				`</span>`
 		plugins.slots[val].Separator = false
 		plugins.slots[val].SeparatorBlockWidth = 0
 
