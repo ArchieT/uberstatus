@@ -137,7 +137,7 @@ func (plugins *pluginMap) parseUpdate(update uber.Update) {
 				`<span color="` + plugins.slotColor[val] +
 				`" background="` + plugins.slotColor[val+1] +
 				`">` +
-				`` +
+				`` + //
 				`</span>`
 		plugins.slots[val].Separator = false
 		plugins.slots[val].SeparatorBlockWidth = 0
