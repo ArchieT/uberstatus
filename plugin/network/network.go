@@ -16,6 +16,7 @@ var log = logging.MustGetLogger("main")
 
 type Config struct {
 	iface string
+	bytes bool
 }
 
 type netStats struct {
@@ -79,12 +80,21 @@ func loadConfig(raw map[string]interface{}) Config {
 			switch {
 			case key == `iface`:
 				c.iface = converted
-				log.Warningf("-- %s %s--", key, c.iface)
-
+			default:
+				log.Warningf("-- %s %s--", key, converted)
 			}
 		} else {
-			log.Warningf("-- %s--", key)
-			_ = ok
+			converted, ok := value.(bool)
+			if ok {
+				switch {
+				case key == `bytes`:
+					c.bytes = converted
+				default:
+					log.Warningf("-- %s bool::%t--", key, converted)
+				}
+			} else {
+				log.Warningf("-- %s--", key)
+			}
 		}
 	}
 	return c
@@ -172,7 +182,7 @@ func Update(update chan uber.Update, cfg Config, stats *netStats) {
 	stats.ewmaTx.Add(txBw)
 	rxAvg := stats.ewmaRx.Value()
 	txAvg := stats.ewmaTx.Value()
-	divider, unit := getUnit(rxAvg + txAvg)
+	divider, unit := getUnit(rxAvg + txAvg, cfg.bytes)
 	// if speed is very low alias it to 0
 	if rxAvg < 0.1 {
 		rxAvg = 0
@@ -182,11 +192,11 @@ func Update(update chan uber.Update, cfg Config, stats *netStats) {
 	}
 	ev.FullText = fmt.Sprintf(`<span color="#aaffaa">%s</span>:<span color="%s">%6.3g</span>/<span color="%s">%6.3g</span><span color="%s"> %s</span>`,
 		cfg.iface,
-		getBwColor(rxAvg),
+		getBwColor(rxAvg, cfg.bytes),
 		rxAvg/divider,
-		getBwColor(txAvg),
+		getBwColor(txAvg, cfg.bytes),
 		txAvg/divider,
-		getBwColor(txAvg+rxAvg),
+		getBwColor(txAvg+rxAvg, cfg.bytes),
 		unit,
 	)
 	ev.ShortText = fmt.Sprintf(`-%s-`, cfg.iface)
@@ -203,32 +213,52 @@ func getStats(iface string) (uint64, uint64) {
 	return rx, tx
 }
 
-func getBwColor(bw float64) string {
+func eight(w bool) int {
+	if w {
+		return 8
+	}
+	return 1
+}
+
+func getBwColor(bw float64, bytes bool) string {
+	e := eight(bytes)
+	bwi := int(bw)
 	switch {
-	case bw < 50*1024:
+	case bwi < 50*1024/e:
 		return "#666666"
-	case bw < 150*1024:
+	case bwi < 150*1024/e:
 		return "#11aaff"
-	case bw < 450*1024:
+	case bwi < 450*1024/e:
 		return "#00ffff"
-	case bw < 4*1024*1024:
+	case bwi < 4*1024*1024/e:
 		return "#00ff00"
-	case bw < 8*1024*1024:
+	case bwi < 8*1024*1024/e:
 		return "#99ff00"
-	case bw < 16*1024*1024:
+	case bwi < 16*1024*1024/e:
 		return "#ffff00"
 	default:
 		return "#ff4400"
 	}
 }
 
-func getUnit(bytes float64) (divider float64, unit string) {
-	switch {
-	case bytes < 125*1024:
-		return 1024 / 8, `Kb`
-	case bytes < 100*1024*1024:
-		return 1024 * 1024 / 8, `Mb`
-	default:
-		return 1024 * 1024 * 1024 / 8, `Gb`
+func getUnit(bytes float64, wbytes bool) (divider float64, unit string) {
+	if !wbytes {
+		switch {
+		case bytes < 125 * 1024:
+			return 1024 / 8, `Kb`
+		case bytes < 100 * 1024 * 1024:
+			return 1024 * 1024 / 8, `Mb`
+		default:
+			return 1024 * 1024 * 1024 / 8, `Gb`
+		}
+	} else {
+		switch {
+		case bytes < 1024*1024:
+			return 1024, "KB"
+		case bytes < 1024*1024*1024:
+			return 1024*1024, "MB"
+		default:
+			return 1024*1024*1024, "GB"
+		}
 	}
 }
